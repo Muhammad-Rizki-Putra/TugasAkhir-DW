@@ -3,426 +3,326 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enhanced Revenue Dashboard</title>
-
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <title>OLAP Analysis Dashboard</title>
+    
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-
-    <link href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css" rel="stylesheet">
-
-    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" />
-
+    <!-- DataTables for advanced tables -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+    
+    <!-- Chart.js for data visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
     <style>
         body {
-            background-color: #f4f7fc;
-            font-family: 'Poppins', sans-serif;
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* A light gray background */
         }
-        .sidebar {
-            background-color: #ffffff;
-            height: 100vh;
-            position: fixed;
-            top: 0;
-            left: 0;
+        /* Custom styles for DataTables search input */
+        .dataTables_filter input {
             width: 250px;
-            padding: 20px;
-            box-shadow: 0 0 30px rgba(0, 0, 0, 0.05);
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid #d1d5db;
+            transition: all 0.2s ease-in-out;
         }
-        .main-content {
-            padding: 30px;
+        .dataTables_filter input:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.4);
         }
-        .stat-card {
-            background-color: #ffffff;
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
-            transition: transform 0.2s;
+        /* Style for the sidebar navigation */
+        .nav-link {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            border-radius: 8px;
+            color: #4b5563;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            margin-bottom: 4px;
         }
-        .stat-card:hover {
-            transform: translateY(-5px);
+        .nav-link:hover {
+            background-color: #e5e7eb;
         }
-        .stat-card h5 {
-            color: #6c757d;
-            font-size: 1rem;
+        .nav-link.active {
+            background-color: #4f46e5;
+            color: white;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
         }
-        .stat-card .stat-value {
-            font-size: 2rem;
-            font-weight: 600;
-            color: #343a40;
+        .nav-link .material-icons {
+            margin-right: 12px;
         }
-        .chart-container {
-            background-color: #ffffff;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+        /* Custom loader style */
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #4f46e5;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
         }
-        #revenueTable_wrapper {
-            background-color: #ffffff;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
-        }
-        .filter-section {
-            background-color: #ffffff;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
-            margin-bottom: 20px;
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
-<body>
+<body class="text-gray-800">
 
-    <div class="main-content">
-        <h2 class="mb-4">Revenue Dashboard</h2>
+    <div class="flex h-screen bg-gray-100">
+        <!-- Sidebar Navigation -->
+        <aside class="w-72 bg-white p-4 shadow-lg overflow-y-auto">
+            <h1 class="text-2xl font-bold text-gray-900 mb-6 px-2">OLAP Dashboard</h1>
+            <nav id="olap-nav">
+                <!-- Links will be dynamically populated by JS -->
+            </nav>
+        </aside>
 
-        <div class="row">
-            <div class="col-md-4">
-                <div class="stat-card">
-                    <h5>Total Revenue</h5>
-                    <p class="stat-value" id="total-revenue">0</p>
-                </div>
+        <!-- Main Content Area -->
+        <main class="flex-1 p-6 md:p-8 lg:p-10 overflow-y-auto">
+            <div id="content-header" class="mb-6">
+                <h2 id="current-analysis-title" class="text-3xl font-bold text-gray-900">Welcome</h2>
+                <p id="current-analysis-description" class="text-gray-600 mt-1">Select an analysis from the sidebar to get started.</p>
             </div>
-            <div class="col-md-4">
-                <div class="stat-card">
-                    <h5>Total Transactions</h5>
-                    <p class="stat-value" id="total-transactions">0</p>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="stat-card">
-                    <h5>Top Performing Branch</h5>
-                    <p class="stat-value" id="top-branch">N/A</p>
-                </div>
-            </div>
-        </div>
+            
+            <!-- Filters section, hidden by default -->
+            <div id="filters-container" class="bg-white p-4 rounded-xl shadow-md mb-6 hidden"></div>
 
-        <div class="filter-section">
-             <div class="row align-items-end">
-                <div class="col-md-6">
-                    <label for="branch-filter" class="form-label">Filter by Branch:</label>
-                    <select id="branch-filter" class="form-select">
-                        <option value="">All</option>
-                    </select>
-                </div>
-                <div class="col-md-6">
-                    <label for="date-range-picker" class="form-label">Filter by Date:</label>
-                    <input type="text" id="date-range-picker" class="form-control">
-                </div>
+            <!-- Content Display -->
+            <div id="content-display" class="bg-white p-6 rounded-xl shadow-md min-h-[600px] flex items-center justify-center">
+                
+                <div id="loader" class="loader hidden"></div>
+                <div id="error-message" class="text-center text-red-500 hidden"></div>
+                <div id="results-container" class="w-full"></div>
             </div>
-        </div>
-
-        <div class="row">
-            <div class="col-md-8">
-                <div class="chart-container mb-4">
-                    <canvas id="barChart"></canvas>
-                    <div class="mt-2">
-                        <label for="productSlider" class="form-label">Number of Products Shown: <span id="productSliderValue">5</span></label>
-                        <input type="range" class="form-range" id="productSlider" min="1" value="5" step="1">
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="chart-container mb-4">
-                    <canvas id="pieChart"></canvas>
-                    <div class="mt-2">
-                        <label for="dealerSlider" class="form-label">Number of Dealers Shown: <span id="dealerSliderValue">5</span></label>
-                        <input type="range" class="form-range" id="dealerSlider" min="1" value="5" step="1">
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="mt-4">
-            <table id="revenueTable" class="table table-striped" style="width:100%">
-                <thead>
-                    <tr>
-                        <th>Branch</th>
-                        <th>Dealer</th>
-                        <th>Product</th>
-                        <th>Revenue</th>
-                        <th>Date</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
-        </div>
+        </main>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- jQuery and DataTables scripts -->
     <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-    <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
-    <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
-    <script type="text/javascript" src="https://cdn.jsdelivr.net/momentjs/latest/moment.min.js"></script>
-    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 
     <script>
-        let revenueTable;
-        let barChart, pieChart;
-        let originalData = [];
+        // --- CONFIGURATION ---
+        const ANALYSES = [
+            { id: 'revenue-rollup', title: 'Revenue Roll-up', icon: 'summarize', description: 'Hierarchical revenue totals, from product models up to the grand total.' },
+            // FIXED: Changed 'drilldown-country' to 'drilldown' to match the route definition
+            { id: 'drilldown', title: 'Revenue Drill-down', icon: 'travel_explore', description: 'Analyze monthly revenue patterns for a specific country.', filters: [{type: 'text', id: 'country', label: 'Country Name', defaultValue: 'Indonesia'}]},
+            { id: 'sales-cube', title: 'Sales Cube', icon: 'view_in_ar', description: 'Cross-dimensional analysis of sales by product, year, and country.' },
+            // FIXED: Changed 'slice-product' to 'slice' to match the route definition
+            { id: 'slice', title: 'Product Slice', icon: 'pie_chart', description: 'Focus on the quarterly sales performance of a single product.', filters: [{type: 'text', id: 'product', label: 'Product Name', defaultValue: 'Tahoe'}]},
+            { id: 'dice-performance', title: 'Dice Performance', icon: 'casino', description: 'Pinpoint performance by filtering on branch, year, and quarter.', filters: [
+                {type: 'text', id: 'branch', label: 'Branch Name', defaultValue: 'Alvis Motors'},
+                {type: 'text', id: 'year', label: 'Year', defaultValue: '2017'},
+                {type: 'text', id: 'quarter', label: 'Quarter', defaultValue: 'Q3'},
+            ]},
+            { id: 'pivot-dealer', title: 'Dealer Pivot', icon: 'pivot_table_chart', description: 'Compare dealer performance in selling specific product models (e.g., Audi vs. BMW).' },
+            { id: 'annual-trend', title: 'Annual Growth Trend', icon: 'trending_up', description: 'Track year-over-year revenue growth percentages for each country.' },
+            { id: 'market-share', title: 'Quarterly Market Share', icon: 'share', description: 'Understand product market share dominance within each quarter.' },
+            { id: 'dealer-efficiency', title: 'Dealer Efficiency', icon: 'speed', description: 'Identify the most efficient dealers based on revenue generated per unit sold.' },
+            { id: 'mom-growth', title: 'Month-over-Month Growth', icon: 'calendar_month', description: 'Monitor monthly sales momentum to detect trends or issues early.' },
+            { id: 'top-product-by-location', title: 'Top Product per Location', icon: 'place', description: 'Discover the best-selling product in each business location.' }
+        ];
 
-        // Chart.js Global Configuration
-        Chart.defaults.font.family = "'Poppins', sans-serif";
+        // --- UTILITY FUNCTIONS ---
+        const formatCurrency = (value) => value ? parseFloat(value).toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits:0 }) : '$0';
+        const formatNumber = (value) => value ? parseFloat(value).toLocaleString('en-US') : '0';
+        const formatPercentage = (value) => value ? `${parseFloat(value).toFixed(2)}%` : '0.00%';
+        
+        // --- DOM ELEMENTS ---
+        const $loader = $('#loader');
+        const $initialMessage = $('#initial-message');
+        const $errorMessage = $('#error-message');
+        const $resultsContainer = $('#results-container');
+        const $nav = $('#olap-nav');
+        const $title = $('#current-analysis-title');
+        const $description = $('#current-analysis-description');
+        const $filtersContainer = $('#filters-container');
 
-        function formatCurrency(value) {
-            return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(value);
-        }
-
+        // --- INITIALIZATION ---
         $(document).ready(function () {
-            // Initialize Date Range Picker
-           $('#date-range-picker').daterangepicker({
-                opens: 'left',
-                autoUpdateInput: false,
-                locale: {
-                    cancelLabel: 'Clear'
-                }
-            });
-
-    $('#dealerSlider').on('input', function () {
-        const count = parseInt($(this).val());
-        $('#dealerSliderValue').text(count);
-        updatePieChart(count);
-    });
-
-
-            $('#date-range-picker').on('apply.daterangepicker', function(ev, picker) {
-                $(this).val(picker.startDate.format('MM/DD/YYYY') + ' - ' + picker.endDate.format('MM/DD/YYYY'));
-                filterAndRenderData();
-            });
-
-            $('#date-range-picker').on('cancel.daterangepicker', function(ev, picker) {
-                $(this).val('');
-                filterAndRenderData();
-            });
-
-
-            // Populate branch dropdown
-            $.get('/api/branches', function (branches) {
-                branches.forEach(branch => {
-                    $('#branch-filter').append(`<option value="${branch}">${branch}</option>`);
-                });
-            });
-
-            $('#productSlider').on('input', function () {
-                const count = parseInt($(this).val());
-                $('#productSliderValue').text(count);
-                updateBarChart(count);
-            });
-
-
-            // Load initial data
-            loadInitialData();
-
-            // Reload on branch filter change
-            $('#branch-filter').change(filterAndRenderData);
+            populateNav();
+            // Set the first analysis as active by default
+            if (ANALYSES.length > 0) {
+                loadAnalysis(ANALYSES[0].id);
+            }
         });
 
-        function loadInitialData() {
-            $.get('/api/revenue', function (data) {
-                originalData = data;
-                // Initialize DataTable
-                revenueTable = $('#revenueTable').DataTable({
-                    data: [],
-                    columns: [
-                        { data: 'branch' },
-                        { data: 'dealer' },
-                        { data: 'product' },
-                        { data: 'revenue', render: (d) => formatCurrency(d) },
-                        { data: 'date', render: (d) => moment(d).format('YYYY-MM-DD') },
-                    ],
-                    responsive: true,
-                    language: {
-                        search: "_INPUT_",
-                        searchPlaceholder: "Search records...",
+        // --- CORE LOGIC ---
+
+        /**
+         * Populates the sidebar navigation with links for each analysis.
+         */
+        function populateNav() {
+            ANALYSES.forEach(analysis => {
+                const navLink = $(`
+                    <a class="nav-link" data-id="${analysis.id}">
+                        <span class="material-icons">${analysis.icon}</span>
+                        <span>${analysis.title}</span>
+                    </a>
+                `);
+                navLink.on('click', () => loadAnalysis(analysis.id));
+                $nav.append(navLink);
+            });
+        }
+        
+        /**
+         * Main function to load and render an analysis by its ID.
+         * @param {string} analysisId - The ID of the analysis to load.
+         */
+        async function loadAnalysis(analysisId) {
+            const analysis = ANALYSES.find(a => a.id === analysisId);
+            if (!analysis) return;
+
+            // Update UI state
+            updateHeader(analysis.title, analysis.description);
+            setActiveNav(analysis.id);
+            showLoading(true);
+            $filtersContainer.empty().hide();
+
+            try {
+                // Build filters and get their values if they exist
+                let endpoint = `/api/olap/${analysis.id.replace(/_/g, '-')}`;
+                if (analysis.filters) {
+                    buildFilters(analysis.id, analysis.filters);
+                    const filterValues = getFilterValues(analysis.filters);
+                    
+                    if (analysis.id === 'drilldown' || analysis.id === 'slice') {
+                         endpoint = `/api/olap/${analysis.id}/${encodeURIComponent(Object.values(filterValues)[0])}`;
+                    } else if (analysis.id === 'dice-performance') {
+                        const params = new URLSearchParams(filterValues);
+                        endpoint = `/api/olap/dice?${params.toString()}`;
                     }
-                });
-                filterAndRenderData();
-            });
-        }
-
-        function filterAndRenderData() {
-            let filteredData = [...originalData];
-            const selectedBranch = $('#branch-filter').val();
-            const dateRange = $('#date-range-picker').val();
-
-            // Branch filter
-            if (selectedBranch) {
-                filteredData = filteredData.filter(item => item.branch === selectedBranch);
-            }
-
-            // Date range filter
-            if(dateRange) {
-                const [start, end] = dateRange.split(' - ').map(d => moment(d, 'MM/DD/YYYY'));
-                filteredData = filteredData.filter(item => {
-                    const itemDate = moment(item.date);
-                    return itemDate.isBetween(start, end, null, '[]');
-                });
-            }
-
-            // Update UI
-            renderDataTable(filteredData);
-            renderCharts(filteredData);
-            renderStatCards(filteredData);
-        }
-
-        function renderDataTable(data) {
-             revenueTable.clear().rows.add(data).draw();
-        }
-
-        function renderStatCards(data) {
-            const totalRevenue = data.reduce((sum, item) => sum + parseFloat(item.revenue), 0);
-            const totalTransactions = data.length;
-
-            let topBranch = 'N/A';
-            if (data.length > 0) {
-                const branchRevenue = {};
-                data.forEach(item => {
-                    branchRevenue[item.branch] = (branchRevenue[item.branch] || 0) + parseFloat(item.revenue);
-                });
-                topBranch = Object.keys(branchRevenue).reduce((a, b) => branchRevenue[a] > branchRevenue[b] ? a : b);
-            }
-
-            $('#total-revenue').text(formatCurrency(totalRevenue));
-            $('#total-transactions').text(totalTransactions.toLocaleString());
-            $('#top-branch').text(topBranch);
-        }
-
-
-        let fullDealerLabels = [];
-        let fullDealerData = [];
-
-        let fullProductLabels = [];
-        let fullProductData = [];
-
-        function renderCharts(data) {
-            // Group data for charts
-            const productMap = {};
-            const dealerMap = {};
-            data.forEach(item => {
-                productMap[item.product] = (productMap[item.product] || 0) + parseFloat(item.revenue);
-                dealerMap[item.dealer] = (dealerMap[item.dealer] || 0) + parseFloat(item.revenue);
-            });
-
-            // Prepare Bar Chart Data
-            // Sort productMap descending by revenue
-            const sortedProducts = Object.entries(productMap)
-                .sort((a, b) => b[1] - a[1]); // b[1] - a[1] = descending by revenue
-
-            // Separate labels and data
-            const productLabels = sortedProducts.map(entry => entry[0]);
-            const productData = sortedProducts.map(entry => entry[1]);
-
-            fullProductLabels = productLabels;
-            fullProductData = productData;
-
-            const maxProducts = fullProductLabels.length;
-            $('#productSlider').attr('max', maxProducts);
-            const initialProductCount = Math.min(5, maxProducts);
-            $('#productSlider').val(initialProductCount);
-            $('#productSliderValue').text(initialProductCount);
-
-            updateBarChart(initialProductCount);
-
-            // Prepare Dealer Data (sorted descending)
-            fullDealerLabels = Object.keys(dealerMap);
-            fullDealerData = Object.values(dealerMap);
-
-            const sortedDealers = fullDealerLabels
-                .map((dealer, i) => ({ dealer, revenue: fullDealerData[i] }))
-                .sort((a, b) => b.revenue - a.revenue);
-
-            fullDealerLabels = sortedDealers.map(d => d.dealer);
-            fullDealerData = sortedDealers.map(d => d.revenue);
-
-            const maxDealers = fullDealerLabels.length;
-            $('#dealerSlider').attr('max', maxDealers);
-            const initialCount = Math.min(5, maxDealers);
-            $('#dealerSlider').val(initialCount);
-            $('#dealerSliderValue').text(initialCount);
-
-            updatePieChart(initialCount);
-
-            // Render Bar Chart
-            if (barChart) barChart.destroy();
-            barChart = new Chart(document.getElementById('barChart'), {
-                type: 'bar',
-                data: {
-                    labels: productLabels,
-                    datasets: [{
-                        label: 'Revenue by Product',
-                        data: productData,
-                        backgroundColor: 'rgba(54, 162, 235, 0.6)',
-                        borderColor: 'rgba(54, 162, 235, 1)',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    plugins: {
-                        legend: { display: false },
-                        title: { display: true, text: 'Revenue by Product', font: { size: 16 } }
-                    },
-                    scales: { y: { beginAtZero: true } }
                 }
-            });
-        }
-
-        function updatePieChart(count) {
-    const slicedLabels = fullDealerLabels.slice(0, count);
-    const slicedData = fullDealerData.slice(0, count);
-
-    const backgroundColors = slicedLabels.map((_, i) =>
-        `hsl(${(i * 360 / count)}, 70%, 60%)`
-    );
-
-    if (pieChart) pieChart.destroy();
-    pieChart = new Chart(document.getElementById('pieChart'), {
-        type: 'doughnut',
-        data: {
-            labels: slicedLabels,
-            datasets: [{
-                label: 'Revenue by Dealer',
-                data: slicedData,
-                backgroundColor: backgroundColors,
-                borderColor: '#fff'
-            }]
-        },
-        options: {
-            plugins: {
-                legend: { position: 'bottom' },
-                title: { display: true, text: 'Revenue by Dealer', font: { size: 16 } }
+                
+                // Fetch and render data
+                const response = await fetch(endpoint);
+                if (!response.ok) throw new Error(`Network response was not ok (Status: ${response.status})`);
+                const data = await response.json();
+                
+                renderData(analysis.id, data);
+                
+            } catch (error) {
+                showError(`Failed to load data for "${analysis.title}". Please check the console and ensure the backend API is running.`);
+                console.error("Fetch Error:", error);
+            } finally {
+                showLoading(false);
             }
         }
-    });
-}
+        
+        /**
+         * Builds and displays the filter inputs for an analysis.
+         * @param {string} analysisId - ID to link the "Apply" button.
+         * @param {Array} filters - Array of filter configuration objects.
+         */
+        function buildFilters(analysisId, filters) {
+            let filterHtml = '<div class="flex flex-wrap gap-4 items-end">';
+            filters.forEach(filter => {
+                filterHtml += `
+                    <div>
+                        <label for="filter-${filter.id}" class="block text-sm font-medium text-gray-700 mb-1">${filter.label}</label>
+                        <input type="${filter.type}" id="filter-${filter.id}" value="${filter.defaultValue}" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                `;
+            });
+            filterHtml += `
+                <div>
+                    <button id="apply-filters-btn" class="bg-indigo-600 text-white font-semibold px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors">Apply</button>
+                </div>
+            `;
+            filterHtml += '</div>';
 
-function updateBarChart(count) {
-    const slicedLabels = fullProductLabels.slice(0, count);
-    const slicedData = fullProductData.slice(0, count);
-
-    if (barChart) barChart.destroy();
-    barChart = new Chart(document.getElementById('barChart'), {
-        type: 'bar',
-        data: {
-            labels: slicedLabels,
-            datasets: [{
-                label: 'Revenue by Product',
-                data: slicedData,
-                backgroundColor: 'rgba(54, 162, 235, 0.6)',
-                borderColor: 'rgba(54, 162, 235, 1)',
-                borderWidth: 1
-            }]
-        },
-        options: {
-            plugins: {
-                legend: { display: false },
-                title: { display: true, text: 'Revenue by Product', font: { size: 16 } }
-            },
-            scales: { y: { beginAtZero: true } }
+            $filtersContainer.html(filterHtml).show();
+            $('#apply-filters-btn').on('click', () => loadAnalysis(analysisId));
         }
-    });
-}
+
+        /**
+         * Gets the current values from the displayed filter inputs.
+         * @param {Array} filters - The filter configuration objects.
+         * @returns {Object} An object mapping filter IDs to their values.
+         */
+        function getFilterValues(filters) {
+            const values = {};
+            filters.forEach(filter => {
+                values[filter.id] = $(`#filter-${filter.id}`).val();
+            });
+            return values;
+        }
+
+        /**
+         * Renders the fetched data into a table or chart.
+         * @param {string} analysisId - The ID of the analysis.
+         * @param {Array} data - The data array from the API.
+         */
+        function renderData(analysisId, data) {
+            $resultsContainer.empty();
+            if (!data || data.length === 0) {
+                $resultsContainer.html('<p class="text-center text-gray-500">No data found for this analysis.</p>');
+                return;
+            }
+            
+            // Create a table for the data
+            const tableId = `table-${analysisId}`;
+            const table = $(`<table id="${tableId}" class="display w-full"></table>`);
+            $resultsContainer.append(table);
+
+            // Dynamically generate columns from the first data object
+            const columns = Object.keys(data[0]).map(key => ({
+                title: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), // Format title
+                data: key,
+                // Custom rendering based on column name
+                render: function(data, type, row) {
+                    if (type === 'display') {
+                        if (key.toLowerCase().includes('revenue') || key.toLowerCase().includes('price')) return formatCurrency(data);
+                        if (key.toLowerCase().includes('unit') || key.toLowerCase().includes('total')) return formatNumber(data);
+                        if (key.toLowerCase().includes('pct') || key.toLowerCase().includes('share') || key.toLowerCase().includes('growth')) return formatPercentage(data);
+                    }
+                    return data;
+                }
+            }));
+
+            // Initialize DataTable
+            $(`#${tableId}`).DataTable({
+                data: data,
+                columns: columns,
+                responsive: true,
+                pageLength: 10,
+                lengthMenu: [10, 25, 50, 100],
+                language: { search: "", searchPlaceholder: "Search records..." }
+            });
+        }
+        
+        // --- UI HELPER FUNCTIONS ---
+        
+        function showLoading(isLoading) {
+            $loader.toggleClass('hidden', !isLoading);
+            $initialMessage.toggleClass('hidden', isLoading);
+            $errorMessage.hide();
+            if (isLoading) $resultsContainer.empty();
+        }
+
+        function showError(message) {
+            $resultsContainer.empty();
+            $errorMessage.text(message).show();
+        }
+
+        function updateHeader(title, description) {
+            $title.text(title);
+            $description.text(description);
+        }
+
+        function setActiveNav(analysisId) {
+            $nav.find('.nav-link').removeClass('active');
+            $nav.find(`.nav-link[data-id="${analysisId}"]`).addClass('active');
+        }
+
     </script>
 </body>
 </html>

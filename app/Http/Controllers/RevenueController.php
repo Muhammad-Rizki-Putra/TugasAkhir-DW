@@ -1,99 +1,311 @@
 <?php
 
 namespace App\Http\Controllers;
-use Illuminate\Support\Facades\Log;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB; // Make sure to import the DB facade
 
 class RevenueController extends Controller
 {
-    public function index()
+    /**
+     * 1. Roll-up Revenue per Produk dan Model
+     * FIXED: Table names changed to lowercase ('product').
+     */
+    public function getRevenueRollup()
     {
-        return view('dashboard');
+        $query = "
+            SELECT p.Model_Name AS Model, p.Product_Name AS Product, SUM(r.Revenue) AS Total_Revenue
+            FROM revenue r JOIN product p ON r.Product_ID = p.Product_ID
+            GROUP BY p.Model_Name, p.Product_Name
+
+            UNION ALL
+
+            -- Group by Model (subtotal for products)
+            SELECT p.Model_Name AS Model, 'TOTAL MODEL' AS Product, SUM(r.Revenue) AS Total_Revenue
+            FROM revenue r JOIN product p ON r.Product_ID = p.Product_ID
+            GROUP BY p.Model_Name
+
+            UNION ALL
+
+            -- Grand total
+            SELECT 'TOTAL ALL' AS Model, '' AS Product, SUM(r.Revenue) AS Total_Revenue
+            FROM revenue r
+
+        ";
+
+        $data = DB::select($query);
+        return response()->json($data);
     }
 
-    public function getRevenueData(Request $request)
+    /**
+     * 2. Drill-down Revenue per Bulan di Negara Tertentu
+     * FIXED: Table names changed to lowercase ('date', 'branch').
+     */
+    public function getDrilldownByCountry($country)
     {
-        $branchFilter = $request->input('branch');
+        $query = "
+            SELECT d.year, d.Month, SUM(r.Revenue) AS Monthly_Revenue
+            FROM revenue r
+            JOIN date d ON r.Date_ID = d.Date_ID
+            JOIN branch b ON r.Branch_ID = b.Branch_ID
+            WHERE b.Country_Name = ?
+            GROUP BY d.year, d.Month
+            ORDER BY d.year ASC, CAST(d.Month AS INT) ASC
+        ";
 
-        Log::info('Getting revenue data...');
+        $data = DB::select($query, [$country]); // Use parameter binding for security
+        return response()->json($data);
+    }
+    
+    /**
+     * 3. Penjualan total dan revenue per produk, per tahun, dan per negara (CUBE)
+     * FIXED: Table names changed to lowercase ('product', 'date', 'dealer', 'location').
+     */
+    public function getSalesCube()
+    {
+        $query = "
+            -- Group by all three dimensions
+            SELECT P.Product_Name, D.Year, L.Country_Name, SUM(R.Revenue) AS Total_Revenue, SUM(R.Units_Sold) AS Total_Units
+            FROM revenue R JOIN product P ON R.Product_ID = P.Product_ID JOIN date D ON R.Date_ID = D.Date_ID JOIN dealer De ON R.Dealer_ID = De.Dealer_ID JOIN location L ON De.Location_ID = L.Location_ID
+            GROUP BY P.Product_Name, D.Year, L.Country_Name
 
-        $revenueData = $this->readCsv(storage_path('app/revenue.csv'));
-        Log::info('Revenue data count: ' . count($revenueData));
+            UNION ALL
 
-        // Log satu baris isi file
-        Log::info('Sample row: ', $revenueData[0] ?? []);
-        $branchData = $this->indexById(storage_path('app/branch.csv'), 'Branch_ID', 'Branch_NM');
-        $dealerData = $this->indexById(storage_path('app/dealer.csv'), 'Dealer_ID', 'Dealer_NM');
-        $dateData = $this->indexById(storage_path('app/date.csv'), 'Date_ID', 'Date');
-        $productData = $this->indexById(storage_path('app/product.csv'), 'Product_ID', 'Product_Name');
+            -- Group by Product and Year (subtotal for countries)
+            SELECT P.Product_Name, D.Year, 'All Countries' AS Country_Name, SUM(R.Revenue) AS Total_Revenue, SUM(R.Units_Sold) AS Total_Units
+            FROM revenue R JOIN product P ON R.Product_ID = P.Product_ID JOIN date D ON R.Date_ID = D.Date_ID
+            GROUP BY P.Product_Name, D.Year
 
-        $result = [];
+            UNION ALL
 
-        foreach ($revenueData as $row) {
-            $branchName = $branchData[$row['Branch_ID']] ?? 'Unknown';
-            $dealerName = $dealerData[$row['Dealer_ID']] ?? 'Unknown';
-            $date = $dateData[$row['Date_ID']] ?? 'Unknown';
-            $product = $productData[$row['Product_ID']] ?? $row['Product_ID'];
+            -- Group by Product and Country (subtotal for years)
+            SELECT P.Product_Name, 'All Years' AS Year, L.Country_Name, SUM(R.Revenue) AS Total_Revenue, SUM(R.Units_Sold) AS Total_Units
+            FROM revenue R JOIN product P ON R.Product_ID = P.Product_ID JOIN dealer De ON R.Dealer_ID = De.Dealer_ID JOIN location L ON De.Location_ID = L.Location_ID
+            GROUP BY P.Product_Name, L.Country_Name
 
-            if ($branchFilter && $branchName !== $branchFilter) {
-                continue;
-            }
+            UNION ALL
 
-            $result[] = [
-                'branch' => $branchName,
-                'dealer' => $dealerName,
-                'product' => $product,
-                'revenue' => $row['Revenue'],
-                'date' => $date,
-            ];
-        }
+            -- Group by Year and Country (subtotal for products)
+            SELECT 'All Products' AS Product_Name, D.Year, L.Country_Name, SUM(R.Revenue) AS Total_Revenue, SUM(R.Units_Sold) AS Total_Units
+            FROM revenue R JOIN date D ON R.Date_ID = D.Date_ID JOIN dealer De ON R.Dealer_ID = De.Dealer_ID JOIN location L ON De.Location_ID = L.Location_ID
+            GROUP BY D.Year, L.Country_Name
 
-        return response()->json($result);
+            UNION ALL
+
+            -- Grand Total
+            SELECT 'All Products' AS Product_Name, 'All Years' AS Year, 'All Countries' AS Country_Name, SUM(R.Revenue) AS Total_Revenue, SUM(R.Units_Sold) AS Total_Units
+            FROM revenue R
+        ";
+
+        $data = DB::select($query);
+        return response()->json($data);
     }
 
-    public function getBranches()
+
+    /**
+     * 4. Slice Revenue untuk Produk Tertentu
+     * FIXED: Table names changed to lowercase ('product', 'date').
+     */
+    public function getSliceByProduct($product)
     {
-        $branches = [];
+        $query = "
+            SELECT p.Product_Name, d.year, d.Quarter, SUM(r.Units_Sold) AS Total_Units, SUM(r.Revenue) AS Total_Revenue
+            FROM revenue r
+            JOIN product p ON r.Product_ID = p.Product_ID
+            JOIN date d ON r.Date_ID = d.Date_ID
+            WHERE p.Product_Name = ?
+            GROUP BY p.Product_Name, d.year, d.Quarter
+            ORDER BY d.year, d.Quarter
+        ";
 
-        $data = $this->readCsv(storage_path('app/branch.csv'));
-        foreach ($data as $row) {
-            $branches[] = $row['Branch_NM'];
-        }
+        $data = DB::select($query, [$product]);
+        return response()->json($data);
+    }
+    
+    /**
+     * 5. Dice Revenue for a specific branch, quarter, and year
+     * FIXED: Table names changed to lowercase ('product', 'branch', 'date').
+     */
+    public function getDicePerformance(Request $request)
+    {
+        $branch = $request->query('branch', 'Alvis Motors');
+        $quarter = $request->query('quarter', 'Q3');
+        $year = $request->query('year', '2017');
 
-        return response()->json(array_unique($branches));
+        $query = "
+            SELECT p.Product_Name, SUM(r.Revenue) AS Product_Revenue
+            FROM revenue r
+            JOIN product p ON r.Product_ID = p.Product_ID
+            JOIN branch b ON r.Branch_ID = b.Branch_ID
+            JOIN date d ON r.Date_ID = d.Date_ID
+            WHERE b.Branch_NM = ? AND d.Quarter = ? AND d.Year = ?
+            GROUP BY p.Product_Name
+            ORDER BY Product_Revenue DESC
+        ";
+
+        $data = DB::select($query, [$branch, $quarter, $year]);
+        return response()->json($data);
+    }
+    
+    /**
+     * 6. Pivot Analisis Revenue per Dealer dan Kategori Produk
+     * FIXED: The PIVOT function is not available in SQLite.
+     * This query has been rewritten using conditional aggregation (CASE statements) to achieve the same result.
+     * Also fixed table names to lowercase ('dealer', 'product').
+     */
+    public function getPivotDealer()
+    {
+        $query = "
+            SELECT
+                d.Dealer_NM,
+                SUM(CASE WHEN p.Model_Name LIKE '%Audi%' THEN r.Revenue ELSE 0 END) AS Audi_Revenue,
+                SUM(CASE WHEN p.Model_Name LIKE '%BMW%' THEN r.Revenue ELSE 0 END) AS BMW_Revenue,
+                SUM(CASE WHEN p.Model_Name LIKE '%Audi%' OR p.Model_Name LIKE '%BMW%' THEN r.Revenue ELSE 0 END) AS Revenue_Combined
+            FROM revenue r
+            JOIN dealer d ON r.Dealer_ID = d.Dealer_ID
+            JOIN product p ON r.Product_ID = p.Product_ID
+            WHERE p.Model_Name LIKE '%Audi%' OR p.Model_Name LIKE '%BMW%'
+            GROUP BY d.Dealer_NM
+            ORDER BY Revenue_Combined DESC
+        ";
+
+        $data = DB::select($query);
+        return response()->json($data);
+    }
+    
+    /**
+     * 7. Trend Revenue Tahunan per Negara
+     * FIXED: Table names changed to lowercase ('branch', 'date').
+     */
+    public function getAnnualTrend()
+    {
+        $query = "
+            SELECT
+                b.Country_Name,
+                d.Year,
+                SUM(r.Revenue) AS Annual_Revenue,
+                (SUM(r.Revenue) - LAG(SUM(r.Revenue), 1) OVER (PARTITION BY b.Country_Name ORDER BY d.Year)) * 100.0 /
+                LAG(SUM(r.Revenue), 1) OVER (PARTITION BY b.Country_Name ORDER BY d.Year) AS Growth_Pct
+            FROM revenue r
+            JOIN branch b ON r.Branch_ID = b.Branch_ID
+            JOIN date d ON r.Date_ID = d.Date_ID
+            GROUP BY b.Country_Name, d.Year
+            ORDER BY b.Country_Name, d.Year
+        ";
+
+        $data = DB::select($query);
+        return response()->json($data);
     }
 
-    // Fungsi bantu baca CSV sebagai array
-    private function readCsv($path)
+    /**
+     * 8. Analisis Market Share Produk per Kuartal
+     * FIXED: Table names changed to lowercase ('product', 'date').
+     */
+    public function getMarketShare()
     {
-        $rows = [];
-        if (!file_exists($path)) return $rows;
+        $query = "
+            SELECT
+                d.Year,
+                d.Quarter,
+                p.Product_Name,
+                SUM(r.Revenue) AS Product_Revenue,
+                SUM(r.Revenue) * 100.0 / SUM(SUM(r.Revenue)) OVER (PARTITION BY d.Year, d.Quarter) AS Market_Share_Pct
+            FROM revenue r
+            JOIN product p ON r.Product_ID = p.Product_ID
+            JOIN date d ON r.Date_ID = d.Date_ID
+            GROUP BY d.Year, d.Quarter, p.Product_Name
+            ORDER BY d.Year, d.Quarter, Market_Share_Pct DESC
+        ";
 
-        if (($handle = fopen($path, 'r')) !== false) {
-            // Baca header
-            $header = fgetcsv($handle, 1000, ',');
-
-            // Hapus BOM jika ada
-            $header[0] = preg_replace('/^\xEF\xBB\xBF/', '', $header[0]);
-
-            while (($data = fgetcsv($handle, 1000, ',')) !== false) {
-                $rows[] = array_combine($header, $data);
-            }
-            fclose($handle);
-        }
-
-        return $rows;
+        $data = DB::select($query);
+        return response()->json($data);
     }
 
-    private function indexById($path, $idKey, $valueKey)
+    /**
+     * 9. Analisis Efisiensi Dealer (Revenue per Unit)
+     * FIXED: Table names changed to lowercase ('dealer', 'location').
+     */
+    public function getDealerEfficiency()
     {
-        $data = $this->readCsv($path);
-        $result = [];
-        foreach ($data as $row) {
-            $result[$row[$idKey]] = $row[$valueKey];
-        }
-        return $result;
+        $query = "
+            SELECT
+                d.Dealer_NM,
+                l.Location_NM,
+                SUM(r.Revenue) AS Total_Revenue,
+                SUM(r.Units_Sold) AS Total_Units,
+                SUM(r.Revenue) * 1.0 / SUM(r.Units_Sold) AS Revenue_per_Unit
+            FROM revenue r
+            JOIN dealer d ON r.Dealer_ID = d.Dealer_ID
+            JOIN location l ON d.Location_ID = l.Location_ID
+            GROUP BY d.Dealer_NM, l.Location_NM
+            ORDER BY Revenue_per_Unit DESC
+        ";
+
+        $data = DB::select($query);
+        return response()->json($data);
+    }
+
+    /**
+     * 10. Perbandingan Revenue Bulan Ini vs Bulan Sebelumnya
+     * FIXED: Table names changed to lowercase ('branch', 'date').
+     */
+    public function getMonthOverMonthGrowth()
+    {
+        $query = "
+            WITH Monthly_Revenue AS (
+                SELECT
+                    b.Country_Name,
+                    d.Year,
+                    d.Month,
+                    SUM(r.Revenue) AS Current_Month_Revenue,
+                    LAG(SUM(r.Revenue), 1) OVER (PARTITION BY b.Country_Name ORDER BY d.Year, d.Month) AS Previous_Month_Revenue
+                FROM revenue r
+                JOIN branch b ON r.Branch_ID = b.Branch_ID
+                JOIN date d ON r.Date_ID = d.Date_ID
+                GROUP BY b.Country_Name, d.Year, d.Month
+            )
+            SELECT
+                Country_Name,
+                Year,
+                Month,
+                Current_Month_Revenue,
+                Previous_Month_Revenue,
+                (Current_Month_Revenue - Previous_Month_Revenue) * 100.0 / Previous_Month_Revenue AS MoM_Growth
+            FROM Monthly_Revenue
+            WHERE Previous_Month_Revenue IS NOT NULL
+            ORDER BY Country_Name, Year, CAST(Month AS INT)
+        ";
+
+        $data = DB::select($query);
+        return response()->json($data);
+    }
+
+    /**
+     * 11. Analisis Produk dengan Revenue Tertinggi per Lokasi
+     * FIXED: Table names changed to lowercase ('product', 'dealer', 'location').
+     */
+    public function getTopProductByLocation()
+    {
+        $query = "
+            WITH Ranked_Products AS (
+                SELECT
+                    l.Location_NM,
+                    p.Product_Name,
+                    SUM(r.Revenue) AS Total_Revenue,
+                    RANK() OVER (PARTITION BY l.Location_NM ORDER BY SUM(r.Revenue) DESC) as Revenue_Rank
+                FROM revenue r
+                JOIN product p ON r.Product_ID = p.Product_ID
+                JOIN dealer d ON r.Dealer_ID = d.Dealer_ID
+                JOIN location l ON d.Location_ID = l.Location_ID
+                GROUP BY l.Location_NM, p.Product_Name
+            )
+            SELECT Location_NM, Product_Name, Total_Revenue
+            FROM Ranked_Products
+            WHERE Revenue_Rank = 1
+            ORDER BY Total_Revenue DESC
+        ";
+
+        $data = DB::select($query);
+        return response()->json($data);
     }
 }
-
