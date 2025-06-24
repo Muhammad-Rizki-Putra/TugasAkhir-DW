@@ -61,41 +61,70 @@ class RevenueController extends Controller
      * 3. Penjualan total dan revenue per produk, per tahun, dan per negara (CUBE)
      * FIXED: Table names changed to lowercase ('product', 'date', 'dealer', 'location').
      */
-    public function getSalesCube()
+    public function getSalesCube(Request $request)
     {
-        $query = "
-            -- Group by all three dimensions
-            SELECT P.Product_Name, D.Year, L.Country_Name, SUM(R.Revenue) AS Total_Revenue, SUM(R.Units_Sold) AS Total_Units
-            FROM revenue R JOIN product P ON R.Product_ID = P.Product_ID JOIN date D ON R.Date_ID = D.Date_ID JOIN dealer De ON R.Dealer_ID = De.Dealer_ID JOIN location L ON De.Location_ID = L.Location_ID
-            GROUP BY P.Product_Name, D.Year, L.Country_Name
+        // Get selected dimensions from the request, default to all if none provided
+        $selectedDimensions = $request->input('dimensions', ['Product_Name', 'Year', 'Country_Name']);
 
-            UNION ALL
+        // Ensure valid dimensions (security and data integrity)
+        $allowedDimensions = ['Product_Name', 'Year', 'Country_Name', /* add other potential dimensions like 'Branch', 'Quarter' */];
+        $validDimensions = array_intersect($selectedDimensions, $allowedDimensions);
 
-            -- Group by Product and Year (subtotal for countries)
-            SELECT P.Product_Name, D.Year, 'All Countries' AS Country_Name, SUM(R.Revenue) AS Total_Revenue, SUM(R.Units_Sold) AS Total_Units
-            FROM revenue R JOIN product P ON R.Product_ID = P.Product_ID JOIN date D ON R.Date_ID = D.Date_ID
-            GROUP BY P.Product_Name, D.Year
+        if (empty($validDimensions)) {
+            // If no valid dimensions are selected, return a base aggregate or an error
+            $query = "
+                SELECT 'All Products' AS Product_Name, 'All Years' AS Year, 'All Countries' AS Country_Name, SUM(R.Revenue) AS Total_Revenue, SUM(R.Units_Sold) AS Total_Units
+                FROM revenue R
+            ";
+        } else {
+            // Build the GROUP BY clause dynamically
+            $groupByColumns = implode(', ', array_map(function($dim) {
+                // Map dimension names to actual table columns if they differ
+                // e.g., 'Product_Name' -> 'P.Product_Name'
+                if ($dim === 'Product_Name') return 'P.Product_Name';
+                if ($dim === 'Year') return 'D.Year';
+                if ($dim === 'Country_Name') return 'L.Country_Name';
+                // Add more mappings if needed
+                return $dim; // Fallback
+            }, $validDimensions));
 
-            UNION ALL
+            $selectColumns = implode(', ', array_map(function($dim) {
+                if ($dim === 'Product_Name') return 'P.Product_Name';
+                if ($dim === 'Year') return 'D.Year';
+                if ($dim === 'Country_Name') return 'L.Country_Name';
+                // Add more mappings
+                return "NULL AS " . $dim; // If a dimension isn't selected, return NULL for its column
+            }, $validDimensions));
 
-            -- Group by Product and Country (subtotal for years)
-            SELECT P.Product_Name, 'All Years' AS Year, L.Country_Name, SUM(R.Revenue) AS Total_Revenue, SUM(R.Units_Sold) AS Total_Units
-            FROM revenue R JOIN product P ON R.Product_ID = P.Product_ID JOIN dealer De ON R.Dealer_ID = De.Dealer_ID JOIN location L ON De.Location_ID = L.Location_ID
-            GROUP BY P.Product_Name, L.Country_Name
 
-            UNION ALL
+            // Build the JOIN clauses dynamically based on selected dimensions
+            $joins = [];
+            if (in_array('Product_Name', $validDimensions)) {
+                $joins[] = 'JOIN product P ON R.Product_ID = P.Product_ID';
+            }
+            if (in_array('Year', $validDimensions)) {
+                $joins[] = 'JOIN date D ON R.Date_ID = D.Date_ID';
+            }
+            if (in_array('Country_Name', $validDimensions)) {
+                $joins[] = 'JOIN dealer De ON R.Dealer_ID = De.Dealer_ID';
+                $joins[] = 'JOIN location L ON De.Location_ID = L.Location_ID';
+            }
+            // Add more joins for other dimensions
 
-            -- Group by Year and Country (subtotal for products)
-            SELECT 'All Products' AS Product_Name, D.Year, L.Country_Name, SUM(R.Revenue) AS Total_Revenue, SUM(R.Units_Sold) AS Total_Units
-            FROM revenue R JOIN date D ON R.Date_ID = D.Date_ID JOIN dealer De ON R.Dealer_ID = De.Dealer_ID JOIN location L ON De.Location_ID = L.Location_ID
-            GROUP BY D.Year, L.Country_Name
+            $joinedTables = implode(' ', array_unique($joins)); // Use array_unique to avoid duplicate joins
 
-            UNION ALL
-
-            -- Grand Total
-            SELECT 'All Products' AS Product_Name, 'All Years' AS Year, 'All Countries' AS Country_Name, SUM(R.Revenue) AS Total_Revenue, SUM(R.Units_Sold) AS Total_Units
-            FROM revenue R
-        ";
+            $query = "
+                SELECT
+                    " . (in_array('Product_Name', $validDimensions) ? 'P.Product_Name' : "'All Products' AS Product_Name") . ",
+                    " . (in_array('Year', $validDimensions) ? 'D.Year' : "'All Years' AS Year") . ",
+                    " . (in_array('Country_Name', $validDimensions) ? 'L.Country_Name' : "'All Countries' AS Country_Name") . ",
+                    SUM(R.Revenue) AS Total_Revenue,
+                    SUM(R.Units_Sold) AS Total_Units
+                FROM revenue R
+                $joinedTables
+                GROUP BY $groupByColumns
+                ORDER BY " . $groupByColumns; // Add ordering for better presentation
+        }
 
         $data = DB::select($query);
         return response()->json($data);

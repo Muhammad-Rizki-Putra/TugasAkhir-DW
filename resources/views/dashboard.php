@@ -93,7 +93,28 @@
             </div>
             
             <!-- Filters section, hidden by default -->
-            <div id="filters-container" class="bg-white p-4 rounded-xl shadow-md mb-6 hidden"></div>
+            <div id="filters-container" class="bg-white p-4 rounded-xl shadow-md mb-6 hidden">
+                
+            </div>
+
+            <div id="dimension-selector" class="bg-white p-4 rounded-xl shadow-md mb-6 hidden">
+                    <h3 class="text-lg font-semibold mb-3">Select Dimensions:</h3>
+                    <div class="flex gap-4">
+                        <label class="inline-flex items-center">
+                            <input type="checkbox" class="form-checkbox text-indigo-600" checked id="dim-product" value="Product_Name">
+                            <span class="ml-2">Product</span>
+                        </label>
+                        <label class="inline-flex items-center">
+                            <input type="checkbox" class="form-checkbox text-indigo-600" checked id="dim-year" value="Year">
+                            <span class="ml-2">Year</span>
+                        </label>
+                        <label class="inline-flex items-center">
+                            <input type="checkbox" class="form-checkbox text-indigo-600" checked id="dim-country" value="Country_Name">
+                            <span class="ml-2">Country</span>
+                        </label>
+                        </div>
+                    <button id="apply-dimensions-btn" class="mt-4 bg-indigo-600 text-white font-semibold px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors">Apply Dimensions</button>
+                </div>
 
             <!-- Content Display -->
             <div id="content-display" class="bg-white p-6 rounded-xl shadow-md min-h-[600px] flex items-center justify-center">
@@ -185,21 +206,40 @@
             updateHeader(analysis.title, analysis.description);
             setActiveNav(analysis.id);
             showLoading(true);
-            $filtersContainer.empty().hide();
+            $filtersContainer.empty().hide(); // Clear existing filters
+
+            // Show/hide dimension selector based on analysis type
+            if (analysisId === 'sales-cube') {
+                $('#dimension-selector').show();
+            } else {
+                $('#dimension-selector').hide();
+            }
 
             try {
-                // Build filters and get their values if they exist
                 let endpoint = `/api/olap/${analysis.id.replace(/_/g, '-')}`;
+                let params = new URLSearchParams();
+
+                // Existing filter handling (drilldown, slice, dice)
                 if (analysis.filters) {
-                    buildFilters(analysis.id, analysis.filters);
+                    buildFilters(analysis.id, analysis.filters); // Rebuild filters for existing analyses
                     const filterValues = getFilterValues(analysis.filters);
                     
                     if (analysis.id === 'drilldown' || analysis.id === 'slice') {
                          endpoint = `/api/olap/${analysis.id}/${encodeURIComponent(Object.values(filterValues)[0])}`;
                     } else if (analysis.id === 'dice-performance') {
-                        const params = new URLSearchParams(filterValues);
+                        params = new URLSearchParams(filterValues); // Use params for dice
                         endpoint = `/api/olap/dice?${params.toString()}`;
                     }
+                }
+
+                // Handle Sales Cube specific dimension selection
+                if (analysisId === 'sales-cube') {
+                    const selectedDimensions = [];
+                    $('#dimension-selector input[type="checkbox"]:checked').each(function() {
+                        selectedDimensions.push($(this).val());
+                    });
+                    selectedDimensions.forEach(dim => params.append('dimensions[]', dim)); // Append as array
+                    endpoint = `/api/olap/sales-cube?${params.toString()}`; // Update endpoint for sales cube
                 }
                 
                 // Fetch and render data
@@ -216,6 +256,8 @@
                 showLoading(false);
             }
         }
+
+        $('#apply-dimensions-btn').on('click', () => loadAnalysis('sales-cube'));
         
         /**
          * Builds and displays the filter inputs for an analysis.
