@@ -5,25 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OLAP Analysis Dashboard</title>
     
-    <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Google Fonts & Icons -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 
-    <!-- DataTables for advanced tables -->
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
     
-    <!-- Chart.js for data visualization -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f3f4f6; /* A light gray background */
+            background-color: #f3f4f6;
         }
-        /* Custom styles for DataTables search input */
         .dataTables_filter input {
             width: 250px;
             padding: 8px 12px;
@@ -36,7 +31,6 @@
             border-color: #4f46e5;
             box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.4);
         }
-        /* Style for the sidebar navigation */
         .nav-link {
             display: flex;
             align-items: center;
@@ -59,7 +53,6 @@
         .nav-link .material-icons {
             margin-right: 12px;
         }
-        /* Custom loader style */
         .loader {
             border: 5px solid #f3f3f3;
             border-top: 5px solid #4f46e5;
@@ -72,30 +65,54 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        /* Custom slider style */
+        input[type=range].slider {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 8px;
+            background: #d1d5db;
+            outline: none;
+            opacity: 0.7;
+            -webkit-transition: .2s;
+            transition: opacity .2s;
+            border-radius: 4px;
+        }
+        input[type=range].slider:hover {
+            opacity: 1;
+        }
+        input[type=range].slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #4f46e5;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+        input[type=range].slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #4f46e5;
+            cursor: pointer;
+            border-radius: 50%;
+        }
     </style>
 </head>
 <body class="text-gray-800">
 
     <div class="flex h-screen bg-gray-100">
-        <!-- Sidebar Navigation -->
         <aside class="w-72 bg-white p-4 shadow-lg overflow-y-auto">
             <h1 class="text-2xl font-bold text-gray-900 mb-6 px-2">OLAP Dashboard</h1>
-            <nav id="olap-nav">
-                <!-- Links will be dynamically populated by JS -->
-            </nav>
+            <nav id="olap-nav"></nav>
         </aside>
 
-        <!-- Main Content Area -->
         <main class="flex-1 p-6 md:p-8 lg:p-10 overflow-y-auto">
             <div id="content-header" class="mb-6">
                 <h2 id="current-analysis-title" class="text-3xl font-bold text-gray-900">Welcome</h2>
                 <p id="current-analysis-description" class="text-gray-600 mt-1">Select an analysis from the sidebar to get started.</p>
             </div>
             
-            <!-- Filters section, hidden by default -->
-            <div id="filters-container" class="bg-white p-4 rounded-xl shadow-md mb-6 hidden">
-                
-            </div>
+            <div id="filters-container" class="bg-white p-4 rounded-xl shadow-md mb-6 hidden"></div>
 
             <div id="dimension-selector" class="bg-white p-4 rounded-xl shadow-md mb-6 hidden">
                     <h3 class="text-lg font-semibold mb-3">Select Dimensions:</h3>
@@ -112,13 +129,11 @@
                             <input type="checkbox" class="form-checkbox text-indigo-600" checked id="dim-country" value="Country_Name">
                             <span class="ml-2">Country</span>
                         </label>
-                        </div>
+                    </div>
                     <button id="apply-dimensions-btn" class="mt-4 bg-indigo-600 text-white font-semibold px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors">Apply Dimensions</button>
-                </div>
+            </div>
 
-            <!-- Content Display -->
             <div id="content-display" class="bg-white p-6 rounded-xl shadow-md min-h-[600px] flex items-center justify-center">
-                
                 <div id="loader" class="loader hidden"></div>
                 <div id="error-message" class="text-center text-red-500 hidden"></div>
                 <div id="results-container" class="w-full"></div>
@@ -126,7 +141,6 @@
         </main>
     </div>
 
-    <!-- jQuery and DataTables scripts -->
     <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 
@@ -134,10 +148,8 @@
         // --- CONFIGURATION ---
         const ANALYSES = [
             { id: 'revenue-rollup', title: 'Revenue Roll-up', icon: 'summarize', description: 'Hierarchical revenue totals, from product models up to the grand total.' },
-            // FIXED: Changed 'drilldown-country' to 'drilldown' to match the route definition
             { id: 'drilldown', title: 'Revenue Drill-down', icon: 'travel_explore', description: 'Analyze monthly revenue patterns for a specific country.', filters: [{type: 'text', id: 'country', label: 'Country Name', defaultValue: 'Indonesia'}]},
             { id: 'sales-cube', title: 'Sales Cube', icon: 'view_in_ar', description: 'Cross-dimensional analysis of sales by product, year, and country.' },
-            // FIXED: Changed 'slice-product' to 'slice' to match the route definition
             { id: 'slice', title: 'Product Slice', icon: 'pie_chart', description: 'Focus on the quarterly sales performance of a single product.', filters: [{type: 'text', id: 'product', label: 'Product Name', defaultValue: 'Tahoe'}]},
             { id: 'dice-performance', title: 'Dice Performance', icon: 'casino', description: 'Pinpoint performance by filtering on branch, year, and quarter.', filters: [
                 {type: 'text', id: 'branch', label: 'Branch Name', defaultValue: 'Alvis Motors'},
@@ -152,6 +164,12 @@
             { id: 'top-product-by-location', title: 'Top Product per Location', icon: 'place', description: 'Discover the best-selling product in each business location.' }
         ];
 
+        // --- NEW: Global state variables ---
+        let originalData = [];
+        let currentAnalysisId = '';
+        let currentChart = null;
+        let tableInstance = null;
+
         // --- UTILITY FUNCTIONS ---
         const formatCurrency = (value) => value ? parseFloat(value).toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits:0 }) : '$0';
         const formatNumber = (value) => value ? parseFloat(value).toLocaleString('en-US') : '0';
@@ -159,7 +177,6 @@
         
         // --- DOM ELEMENTS ---
         const $loader = $('#loader');
-        const $initialMessage = $('#initial-message');
         const $errorMessage = $('#error-message');
         const $resultsContainer = $('#results-container');
         const $nav = $('#olap-nav');
@@ -170,84 +187,63 @@
         // --- INITIALIZATION ---
         $(document).ready(function () {
             populateNav();
-            // Set the first analysis as active by default
             if (ANALYSES.length > 0) {
                 loadAnalysis(ANALYSES[0].id);
             }
         });
 
         // --- CORE LOGIC ---
-
-        /**
-         * Populates the sidebar navigation with links for each analysis.
-         */
         function populateNav() {
             ANALYSES.forEach(analysis => {
-                const navLink = $(`
-                    <a class="nav-link" data-id="${analysis.id}">
-                        <span class="material-icons">${analysis.icon}</span>
-                        <span>${analysis.title}</span>
-                    </a>
-                `);
+                const navLink = $(`<a class="nav-link" data-id="${analysis.id}"><span class="material-icons">${analysis.icon}</span><span>${analysis.title}</span></a>`);
                 navLink.on('click', () => loadAnalysis(analysis.id));
                 $nav.append(navLink);
             });
         }
         
-        /**
-         * Main function to load and render an analysis by its ID.
-         * @param {string} analysisId - The ID of the analysis to load.
-         */
         async function loadAnalysis(analysisId) {
             const analysis = ANALYSES.find(a => a.id === analysisId);
             if (!analysis) return;
+            
+            currentAnalysisId = analysisId; // NEW: Store current analysis ID
 
-            // Update UI state
             updateHeader(analysis.title, analysis.description);
             setActiveNav(analysis.id);
             showLoading(true);
-            $filtersContainer.empty().hide(); // Clear existing filters
+            $filtersContainer.empty().hide();
 
-            // Show/hide dimension selector based on analysis type
-            if (analysisId === 'sales-cube') {
-                $('#dimension-selector').show();
-            } else {
-                $('#dimension-selector').hide();
-            }
+            $('#dimension-selector').toggle(analysisId === 'sales-cube');
 
             try {
                 let endpoint = `/api/olap/${analysis.id.replace(/_/g, '-')}`;
                 let params = new URLSearchParams();
 
-                // Existing filter handling (drilldown, slice, dice)
                 if (analysis.filters) {
-                    buildFilters(analysis.id, analysis.filters); // Rebuild filters for existing analyses
+                    buildFilters(analysis.id, analysis.filters);
                     const filterValues = getFilterValues(analysis.filters);
-                    
                     if (analysis.id === 'drilldown' || analysis.id === 'slice') {
                          endpoint = `/api/olap/${analysis.id}/${encodeURIComponent(Object.values(filterValues)[0])}`;
                     } else if (analysis.id === 'dice-performance') {
-                        params = new URLSearchParams(filterValues); // Use params for dice
+                        params = new URLSearchParams(filterValues);
                         endpoint = `/api/olap/dice?${params.toString()}`;
                     }
                 }
 
-                // Handle Sales Cube specific dimension selection
                 if (analysisId === 'sales-cube') {
                     const selectedDimensions = [];
-                    $('#dimension-selector input[type="checkbox"]:checked').each(function() {
+                    $('#dimension-selector input:checked').each(function() {
                         selectedDimensions.push($(this).val());
                     });
-                    selectedDimensions.forEach(dim => params.append('dimensions[]', dim)); // Append as array
-                    endpoint = `/api/olap/sales-cube?${params.toString()}`; // Update endpoint for sales cube
+                    // Baris-baris ini mengirim dimensi sebagai array (cth: dimensions[]=Product_Name&dimensions[]=Year)
+                    selectedDimensions.forEach(dim => params.append('dimensions[]', dim)); 
+                    endpoint = `/api/olap/sales-cube?${params.toString()}`;
                 }
                 
-                // Fetch and render data
                 const response = await fetch(endpoint);
                 if (!response.ok) throw new Error(`Network response was not ok (Status: ${response.status})`);
                 const data = await response.json();
                 
-                renderData(analysis.id, data);
+                renderLayout(data); // MODIFIED: Call layout renderer
                 
             } catch (error) {
                 showError(`Failed to load data for "${analysis.title}". Please check the console and ensure the backend API is running.`);
@@ -259,37 +255,18 @@
 
         $('#apply-dimensions-btn').on('click', () => loadAnalysis('sales-cube'));
         
-        /**
-         * Builds and displays the filter inputs for an analysis.
-         * @param {string} analysisId - ID to link the "Apply" button.
-         * @param {Array} filters - Array of filter configuration objects.
-         */
         function buildFilters(analysisId, filters) {
             let filterHtml = '<div class="flex flex-wrap gap-4 items-end">';
             filters.forEach(filter => {
-                filterHtml += `
-                    <div>
-                        <label for="filter-${filter.id}" class="block text-sm font-medium text-gray-700 mb-1">${filter.label}</label>
-                        <input type="${filter.type}" id="filter-${filter.id}" value="${filter.defaultValue}" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
-                    </div>
-                `;
+                filterHtml += `<div><label for="filter-${filter.id}" class="block text-sm font-medium text-gray-700 mb-1">${filter.label}</label><input type="${filter.type}" id="filter-${filter.id}" value="${filter.defaultValue}" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></div>`;
             });
-            filterHtml += `
-                <div>
-                    <button id="apply-filters-btn" class="bg-indigo-600 text-white font-semibold px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors">Apply</button>
-                </div>
-            `;
+            filterHtml += `<div><button id="apply-filters-btn" class="bg-indigo-600 text-white font-semibold px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors">Apply</button></div>`;
             filterHtml += '</div>';
 
             $filtersContainer.html(filterHtml).show();
             $('#apply-filters-btn').on('click', () => loadAnalysis(analysisId));
         }
 
-        /**
-         * Gets the current values from the displayed filter inputs.
-         * @param {Array} filters - The filter configuration objects.
-         * @returns {Object} An object mapping filter IDs to their values.
-         */
         function getFilterValues(filters) {
             const values = {};
             filters.forEach(filter => {
@@ -299,27 +276,130 @@
         }
 
         /**
-         * Renders the fetched data into a table or chart.
-         * @param {string} analysisId - The ID of the analysis.
-         * @param {Array} data - The data array from the API.
+         * NEW: Renders the static layout (slider, canvas, table shell) once.
+         * @param {Array} data - The full data array from the API.
          */
-        function renderData(analysisId, data) {
+        function renderLayout(data) {
+            originalData = [...data]; // Store the full dataset
             $resultsContainer.empty();
-            if (!data || data.length === 0) {
+
+            if (!originalData || originalData.length === 0) {
                 $resultsContainer.html('<p class="text-center text-gray-500">No data found for this analysis.</p>');
                 return;
             }
-            
-            // Create a table for the data
-            const tableId = `table-${analysisId}`;
-            const table = $(`<table id="${tableId}" class="display w-full"></table>`);
-            $resultsContainer.append(table);
 
-            // Dynamically generate columns from the first data object
+            // --- NEW: Slider HTML ---
+            const initialSliderValue = Math.min(originalData.length, 20); // Default to 20 items or less
+            const sliderContainer = $(`
+                <div class="mb-6 p-4 bg-gray-50 rounded-lg shadow-inner">
+                    <div class="flex justify-between items-center mb-1">
+                         <label for="chart-slider" class="block text-sm font-medium text-gray-700">Display Top Items</label>
+                         <span id="slider-label" class="text-sm font-semibold text-indigo-600">${initialSliderValue} / ${originalData.length}</span>
+                    </div>
+                    <input type="range" id="chart-slider" min="1" max="${originalData.length}" value="${initialSliderValue}" class="slider">
+                </div>
+            `);
+            $resultsContainer.append(sliderContainer);
+
+            // --- Canvas and Table Shell ---
+            const chartCanvas = $('<canvas id="analysisChart" class="mb-8" style="max-height: 400px;"></canvas>');
+            const table = $(`<table id="analysisTable" class="display w-full"></table>`);
+            $resultsContainer.append(chartCanvas).append(table);
+
+            // --- Initial Render and Event Listener ---
+            updateViews();
+            $('#chart-slider').on('input', updateViews);
+        }
+
+        /**
+         * NEW: Updates the chart and table based on the slider value.
+         */
+        function updateViews() {
+            const sliderValue = parseInt($('#chart-slider').val());
+            $('#slider-label').text(`${sliderValue} / ${originalData.length}`);
+            
+            const slicedData = originalData.slice(0, sliderValue);
+
+            const ctx = $('#analysisChart')[0].getContext('2d');
+            renderChart(ctx, slicedData);
+            renderTable(slicedData);
+        }
+        
+        /**
+         * MODIFIED: Renders the chart with the provided (potentially sliced) data.
+         * @param {CanvasRenderingContext2D} ctx - The context of the canvas element.
+         * @param {Array} data - The data array to render.
+         */
+        function renderChart(ctx, data) {
+            if (currentChart) {
+                currentChart.destroy();
+            }
+            if(data.length === 0) return;
+
+            const analysis = ANALYSES.find(a => a.id === currentAnalysisId);
+            let chartType = 'bar';
+            const keys = Object.keys(data[0]);
+            let labelKey = keys[0], dataKey = keys[1];
+
+            switch (currentAnalysisId) {
+                case 'annual-trend':
+                case 'mom-growth':
+                case 'drilldown':
+                case 'slice':
+                    chartType = 'line';
+                    labelKey = keys.find(k => k.toLowerCase().includes('year') || k.toLowerCase().includes('month') || k.toLowerCase().includes('quarter')) || keys[0];
+                    dataKey = keys.find(k => k.toLowerCase().includes('growth') || k.toLowerCase().includes('revenue'));
+                    break;
+                case 'market-share':
+                    chartType = 'pie';
+                    labelKey = keys.find(k => k.toLowerCase().includes('product')) || keys[0];
+                    dataKey = keys.find(k => k.toLowerCase().includes('share'));
+                    break;
+                default:
+                    labelKey = keys[0];
+                    dataKey = keys.find(k => k.toLowerCase().includes('revenue')) || keys[1];
+                    break;
+            }
+
+            const labels = data.map(row => row[labelKey]);
+            const chartData = data.map(row => parseFloat(row[dataKey]));
+
+            const chartColors = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6', '#d946ef', '#ec4899'];
+            currentChart = new Chart(ctx, {
+                type: chartType,
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: analysis.title,
+                        data: chartData,
+                        backgroundColor: chartType === 'pie' ? chartColors : (chartType === 'line' ? 'transparent' : '#4f46e5'),
+                        borderColor: '#4f46e5',
+                        borderWidth: chartType === 'line' ? 2 : 1,
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: { y: { beginAtZero: true, ticks: { callback: (v) => dataKey.includes('revenue') ? formatCurrency(v) : (dataKey.includes('share') || dataKey.includes('growth') ? formatPercentage(v) : formatNumber(v)) } } },
+                    plugins: { legend: { display: chartType === 'pie' }, tooltip: { callbacks: { label: (c) => { let l = c.dataset.label || ''; if(l){l+=': '}; let v = c.parsed.y ?? c.parsed; return l + (dataKey.includes('revenue')?formatCurrency(v):dataKey.includes('share')||dataKey.includes('growth')?formatPercentage(v):formatNumber(v))} } } }
+                }
+            });
+        }
+
+        /**
+         * NEW: Renders the table with provided (potentially sliced) data.
+         * @param {Array} data - The data array to render.
+         */
+        function renderTable(data) {
+            if (tableInstance) {
+                tableInstance.destroy();
+                $('#analysisTable').empty(); // Clear headers as well
+            }
+            if(data.length === 0) return;
+
             const columns = Object.keys(data[0]).map(key => ({
-                title: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), // Format title
+                title: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
                 data: key,
-                // Custom rendering based on column name
                 render: function(data, type, row) {
                     if (type === 'display') {
                         if (key.toLowerCase().includes('revenue') || key.toLowerCase().includes('price')) return formatCurrency(data);
@@ -330,22 +410,20 @@
                 }
             }));
 
-            // Initialize DataTable
-            $(`#${tableId}`).DataTable({
+            tableInstance = $('#analysisTable').DataTable({
                 data: data,
                 columns: columns,
                 responsive: true,
                 pageLength: 10,
                 lengthMenu: [10, 25, 50, 100],
-                language: { search: "", searchPlaceholder: "Search records..." }
+                language: { search: "", searchPlaceholder: "Search records..." },
+                destroy: true
             });
         }
         
         // --- UI HELPER FUNCTIONS ---
-        
         function showLoading(isLoading) {
             $loader.toggleClass('hidden', !isLoading);
-            $initialMessage.toggleClass('hidden', isLoading);
             $errorMessage.hide();
             if (isLoading) $resultsContainer.empty();
         }
@@ -364,7 +442,6 @@
             $nav.find('.nav-link').removeClass('active');
             $nav.find(`.nav-link[data-id="${analysisId}"]`).addClass('active');
         }
-
     </script>
 </body>
 </html>
