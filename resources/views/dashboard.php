@@ -416,6 +416,7 @@
                 responsive: true,
                 pageLength: 10,
                 lengthMenu: [10, 25, 50, 100],
+                ordering: false,
                 language: { search: "", searchPlaceholder: "Search records..." },
                 destroy: true
             });
