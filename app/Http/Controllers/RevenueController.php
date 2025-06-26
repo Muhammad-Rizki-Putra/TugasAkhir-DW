@@ -154,6 +154,7 @@ class RevenueController extends Controller
     /**
      * 5. Dice Revenue for a specific branch, quarter, and year
      * FIXED: Table names changed to lowercase ('product', 'branch', 'date').
+     * UPDATED: Removed ORDER BY aggregate result.
      */
     public function getDicePerformance(Request $request)
     {
@@ -169,7 +170,6 @@ class RevenueController extends Controller
             JOIN date d ON r.Date_ID = d.Date_ID
             WHERE b.Branch_NM = ? AND d.Quarter = ? AND d.Year = ?
             GROUP BY p.Product_Name
-            ORDER BY Product_Revenue DESC
         ";
 
         $data = DB::select($query, [$branch, $quarter, $year]);
@@ -181,6 +181,7 @@ class RevenueController extends Controller
      * FIXED: The PIVOT function is not available in SQLite.
      * This query has been rewritten using conditional aggregation (CASE statements) to achieve the same result.
      * Also fixed table names to lowercase ('dealer', 'product').
+     * UPDATED: Removed ORDER BY aggregate result.
      */
     public function getPivotDealer()
     {
@@ -195,7 +196,6 @@ class RevenueController extends Controller
             JOIN product p ON r.Product_ID = p.Product_ID
             WHERE p.Model_Name LIKE '%Audi%' OR p.Model_Name LIKE '%BMW%'
             GROUP BY d.Dealer_NM
-            ORDER BY Revenue_Combined DESC
         ";
 
         $data = DB::select($query);
@@ -229,6 +229,7 @@ class RevenueController extends Controller
     /**
      * 8. Analisis Market Share Produk per Kuartal
      * FIXED: Table names changed to lowercase ('product', 'date').
+     * UPDATED: Removed aggregate result from ORDER BY.
      */
     public function getMarketShare()
     {
@@ -243,7 +244,7 @@ class RevenueController extends Controller
             JOIN product p ON r.Product_ID = p.Product_ID
             JOIN date d ON r.Date_ID = d.Date_ID
             GROUP BY d.Year, d.Quarter, p.Product_Name
-            ORDER BY d.Year, d.Quarter, Market_Share_Pct DESC
+            ORDER BY d.Year, d.Quarter
         ";
 
         $data = DB::select($query);
@@ -253,6 +254,7 @@ class RevenueController extends Controller
     /**
      * 9. Analisis Efisiensi Dealer (Revenue per Unit)
      * FIXED: Table names changed to lowercase ('dealer', 'location').
+     * UPDATED: Removed ORDER BY aggregate result.
      */
     public function getDealerEfficiency()
     {
@@ -267,7 +269,6 @@ class RevenueController extends Controller
             JOIN dealer d ON r.Dealer_ID = d.Dealer_ID
             JOIN location l ON d.Location_ID = l.Location_ID
             GROUP BY d.Dealer_NM, l.Location_NM
-            ORDER BY Revenue_per_Unit DESC
         ";
 
         $data = DB::select($query);
@@ -312,6 +313,7 @@ class RevenueController extends Controller
     /**
      * 11. Analisis Produk dengan Revenue Tertinggi per Lokasi
      * FIXED: Table names changed to lowercase ('product', 'dealer', 'location').
+     * UPDATED: Removed ORDER BY aggregate result.
      */
     public function getTopProductByLocation()
     {
@@ -331,7 +333,6 @@ class RevenueController extends Controller
             SELECT Location_NM, Product_Name, Total_Revenue
             FROM Ranked_Products
             WHERE Revenue_Rank = 1
-            ORDER BY Total_Revenue DESC
         ";
 
         $data = DB::select($query);
